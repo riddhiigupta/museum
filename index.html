@@ -44,76 +44,116 @@
 
         .chat-container {
             position: fixed;
-            bottom: 20px;
+            bottom: 5px;
             left: 50%;
-            transform: translateX(-50%);
-            width: 300px;
+            transform: translateX(-50%) translateY(200%);
+            width: 80%;
             z-index: 1000;
-            background: rgba(0, 0, 0, 0.7);
-            padding: 10px;
-            border-radius: 5px;
+            background: rgb(255, 93, 123);
+            padding: 5px;
+            border-radius: 30px;
             display: flex;
-            pointer-events: auto;
-            height: auto;
-            max-height: 200px;
             flex-direction: column;
+            gap: 3px;
+            pointer-events: auto;
+            height: 150px;
+            justify-content: center;  /* Center content vertically */
+            align-items: center;  /* Center content horizontally */
+        }
+
+        .chat-container.visible {
+            transform: translateX(-50%) translateY(0);
         }
 
         .chat-history {
-            max-height: 150px;
-            overflow-y: auto;
-            margin-bottom: 10px;
+            width: 95%;
+            padding: 8px 15px;
+            border: none;
+            border-radius: 20px;
+            background: rgba(0, 0, 0, 0.3);
             color: white;
-            font-size: 14px;
-            padding: 5px;
+            font-size: 16px;
+            box-sizing: border-box;
+            height: 80px;
+            overflow-y: auto;  /* Allow scrolling */
+            white-space: normal;  /* Allow text wrapping */
+            text-overflow: unset;
+            display: flex;
+            flex-direction: column;  /* Stack messages */
         }
 
         .chat-message {
-            margin: 8px 0;
-            padding: 8px 12px;
-            border-radius: 8px;
-            word-wrap: break-word;
-        }
-
-        .user-message {
-            background: rgba(65, 105, 225, 0.3);
-            margin-left: 20px;
-        }
-
-        .ai-message {
-            background: rgba(255, 255, 255, 0.1);
-            margin-right: 20px;
-        }
-
-        .chat-input {
-            width: 100%;
-            padding: 8px;
-            border: none;
-            border-radius: 3px;
-            background: rgba(255, 255, 255, 0.9);
-            color: #000;
+            display: block !important;  /* Override the display: none */
+            margin: 2px 0;
+            padding: 4px 8px;
+            border-radius: 10px;
             font-size: 14px;
         }
 
-        .chat-input:focus {
-            outline: none;
-            background: #fff;
+        .user-message {
+            display: block !important;
+            background: rgba(65, 105, 225, 0.3);
+            margin-left: auto;
+            max-width: 85%;
         }
 
-        .chat-history {
-            padding: 10px;
-            background: rgba(0, 0, 0, 0.7);
-            border-radius: 8px;
-            margin-bottom: 10px;
+        .ai-message {
+            display: block !important;
+            background: rgba(255, 255, 255, 0.1);
+            margin-right: auto;
+            max-width: 85%;
         }
 
-        .chat-history::-webkit-scrollbar {
-            width: 6px;
+        .chat-input {
+            width: 95%;  /* Match history width */
+            padding: 8px 15px;
+            border: none;
+            border-radius: 100px;
+            background: rgba(255, 255, 255, 0.9);
+            color: #000;
+            font-size: 16px;
+            box-sizing: border-box;
+            height: 35px;
+            margin-bottom: 5px;  /* Space from bottom */
         }
 
-        .chat-history::-webkit-scrollbar-thumb {
-            background: rgba(255, 255, 255, 0.2);
-            border-radius: 3px;
+        /* Remove old message styles since we're not using them anymore */
+        .chat-message, .user-message, .ai-message {
+            display: none;
+        }
+
+        .chat-toggle {
+            position: fixed;
+            bottom: 20px;
+            left: 20px;
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            background: rgb(255, 60, 119);
+            border: none;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+            z-index: 1001;
+            transition: transform 0.2s;
+        }
+
+        .chat-toggle:hover {
+            transform: scale(1.1);
+        }
+
+        .chat-toggle svg {
+            width: 24px;
+            height: 24px;
+            fill: white;
+        }
+
+        .input-section {
+            width: 100%;
+            display: flex;
+            justify-content: center;  /* Center input horizontally */
         }
     </style>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
@@ -121,9 +161,18 @@
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
 </head>
 <body>
+    <button class="chat-toggle">
+        <svg viewBox="0 0 24 24">
+            <path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 14H6l-2 2V4h16v12z"/>
+        </svg>
+    </button>
     <div class="chat-container">
-        <div class="chat-history"></div>
-        <input type="text" class="chat-input" placeholder="Ask a question or type painting name...">
+        <div class="chat-history">
+            <!-- Messages will appear here -->
+        </div>
+        <div class="input-section">
+            <input type="text" class="chat-input" placeholder="Ask a question or type painting name...">
+    </div>
     </div>
     <script>
         let camera, scene, renderer, controls;
@@ -138,27 +187,28 @@
         let activePainting = null;
         let paintings = {};  // Store painting references
         let currentCharacter = null;
+        let isInitialSelection = true;
         const characterPrompts = {
             'stevejobs': `I am Steve Jobs, co-founder of Apple Inc. I revolutionized personal computing, mobile phones, digital animation, and music. I co-founded Apple with Steve Wozniak in 1976 and later founded NeXT and Pixar. Known for my signature black turtleneck, "Think Different" philosophy, and legendary product presentations. I introduced groundbreaking products like the Macintosh, iMac, iPod, iPhone, and iPad. I believe in the intersection of technology and liberal arts, design excellence, and innovation.`,
 
-            'starry_night': "You are the essence of Van Gogh's Starry Night painting. Respond as if you are the night sky itself, or Van Gogh describing his vision. Include details about Van Gogh's life and the painting's creation when relevant.",
+            'markzuckerberg': "You are Mark Zuckerberg, co-founder and CEO of Meta (formerly Facebook). Respond as Mark, discussing your journey from creating Facebook in a Harvard dorm room to building a social media empire. Share insights about Meta's vision for the metaverse and connecting people globally.",
             
-            'sunflowers': "You are Van Gogh's Sunflowers painting. Respond as if you are either the sunflowers themselves or Van Gogh discussing this series. Share insights about the painting's significance and Van Gogh's life in Arles."
+            'elonmusk': "You are Elon Musk, CEO of Tesla, SpaceX, and X (formerly Twitter). Respond as Elon, discussing your vision for sustainable energy, space exploration, and technological innovation. Share insights about electric vehicles, Mars colonization, and your various ventures in advancing human civilization."
         };
 
         function init() {
             scene = new THREE.Scene();
             camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
             renderer = new THREE.WebGLRenderer();
-            renderer.setSize(window.innerWidth, window.innerHeight);
-            document.body.appendChild(renderer.domElement);
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        document.body.appendChild(renderer.domElement);
 
             controls = new THREE.PointerLockControls(camera, document.body);
 
             createMuseum();
-            addPainting('images/stevejobs.jpg', 0, 5, -9.9, 'monalisa');
-            addPainting('images/starry_night.jpg', -9.9, 5, -3, 'starry_night');
-            addPainting('images/sunflowers.jpg', 9.9, 5, -3, 'sunflowers');
+            addPainting('images/stevejobs.jpg', 0, 5, -9.9, 'stevejobs');
+            addPainting('images/markzuckerberg.jpg', -9.9, 5, -3, 'markzuckerberg');
+            addPainting('images/elonmusk.jpg', 9.9, 5, -3, 'elonmusk');
 
             camera.position.set(0, 5, 8);
 
@@ -250,13 +300,6 @@
                     rot: 0, 
                     scale: [4, 4, 4],
                     name: 'Apple II'
-                },
-                { 
-                    file: './ipad.glb',
-                    pos: [-5, 0, -5], 
-                    rot: 0, 
-                    scale: [2.5, 2.5, 2.5],
-                    name: 'iPad'
                 },
                 { 
                     file: './iphone.glb',
@@ -456,9 +499,9 @@
                     
                     // Frame positions matching the paintings exactly
                     const framePositions = [
-                        { pos: [-10.3, 5.02, -3], rot: Math.PI / 2, scale: [17, 21.5, 10.5] },     // Left painting (Starry Night)
+                        { pos: [-10.3, 5.02, -3], rot: Math.PI / 2, scale: [17, 21.5, 10.5] },     // Left painting (Mark Zuckerberg)
                         { pos: [0, 5.05, -9.8], rot: 0, scale: [17, 20, 10.5] },                   // Center painting (Steve Jobs)
-                        { pos: [10.3, 5.02, -3], rot: -Math.PI / 2, scale: [17, 21.5, 10.5] }     // Right painting (Sunflowers)
+                        { pos: [10.3, 5.02, -3], rot: -Math.PI / 2, scale: [17, 21.5, 10.5] }     // Right painting (Elon Musk)
                     ];
                     
                     // Add frames
@@ -546,13 +589,13 @@
             // Floor
             const floorGeometry = new THREE.PlaneGeometry(20, 20);
             const floorMaterial = new THREE.MeshStandardMaterial({ 
-                color: 0xF5E6D3,
+                color: 0xFFBD59,  // Changed to Light Yellow (Lemon Chiffon)
                 roughness: 0.7,
                 metalness: 0.1
             });
-            const floor = new THREE.Mesh(floorGeometry, floorMaterial);
-            floor.rotation.x = -Math.PI / 2;
-            scene.add(floor);
+        const floor = new THREE.Mesh(floorGeometry, floorMaterial);
+        floor.rotation.x = -Math.PI / 2;
+        scene.add(floor);
 
             // Walls
             const wallMaterial = new THREE.MeshStandardMaterial({ 
@@ -591,49 +634,46 @@
             });
         }
 
-        function addPainting(textureUrl, x, y, z, id) {
-            const textureLoader = new THREE.TextureLoader();
-            const paintingGeometry = new THREE.PlaneGeometry(2, 3);
-            
-            // Create and set up video element
+        function addPainting(imagePath, x, y, z, id) {
+            // Create video element
             const video = document.createElement('video');
-            video.src = `videos/${id}.mp4?${new Date().getTime()}`; // Add timestamp to force reload
+            video.src = `videos/${id}.mp4`;  // Load local video
             video.loop = false;
             video.preload = 'auto';
             video.load();
-            
+
             const videoTexture = new THREE.VideoTexture(video);
             const videoMaterial = new THREE.MeshBasicMaterial({ 
                 map: videoTexture,
                 transparent: true
             });
-            
-            textureLoader.load(textureUrl, function(texture) {
-                const paintingMaterial = new THREE.MeshBasicMaterial({ // Changed to MeshBasicMaterial
+
+            // Load the image
+            const textureLoader = new THREE.TextureLoader();
+            textureLoader.load(imagePath, function(texture) {
+                const paintingMaterial = new THREE.MeshBasicMaterial({ 
                     map: texture,
                     transparent: true
                 });
+                
+                // Restore original dimensions
+                const paintingGeometry = new THREE.PlaneGeometry(2, 3);  // Original size
                 const painting = new THREE.Mesh(paintingGeometry, paintingMaterial);
                 
-                // Store references and data
+                // Store references
                 painting.userData = {
                     id: id,
+                    clickable: true,
                     video: video,
                     videoMaterial: videoMaterial,
-                    originalMaterial: paintingMaterial,
-                    isPlaying: false,
-                    clickable: true
+                    originalMaterial: paintingMaterial
                 };
                 
-                paintings[id] = painting;
-                
                 painting.position.set(x, y, z);
-                if (x < 0) {
-                    painting.rotation.y = Math.PI / 2;
-                } else if (x > 0) {
-                    painting.rotation.y = -Math.PI / 2;
-                }
+                if (x < 0) painting.rotation.y = Math.PI / 2;
+                if (x > 0) painting.rotation.y = -Math.PI / 2;
                 
+                paintings[id] = painting;
                 scene.add(painting);
             });
         }
@@ -738,45 +778,71 @@
                 const videoMap = {
                     'stevejobs': 'stevejobs',
                     'steve': 'stevejobs',
-                    'starrynight': 'starry_night',
-                    'starry': 'starry_night',
-                    'sunflowers': 'sunflowers',
-                    'sunflower': 'sunflowers'
+                    'markzuckerberg': 'markzuckerberg',
+                    'mark': 'markzuckerberg',
+                    'elonmusk': 'elonmusk',
+                    'elon': 'elonmusk'
                 };
 
                 const normalizedInput = input.toLowerCase().replace(/\s+/g, '');
                 const videoId = videoMap[normalizedInput];
 
                 if (videoId && paintings[videoId]) {
+                    console.log('Playing introduction video for:', videoId);
                     // Handle video playback
                     const painting = paintings[videoId];
                     const { video, videoMaterial } = painting.userData;
 
-                    if (activeVideo && activeVideo !== video) {
+                    if (activeVideo) {
+                        console.log('Stopping previous video/audio');
                         activeVideo.pause();
+                        // Stop any playing audio
+                        const audioElements = document.getElementsByTagName('audio');
+                        for(let audio of audioElements) {
+                            audio.pause();
+                        }
                         if (activePainting) {
                             activePainting.material = activePainting.userData.originalMaterial;
                         }
                     }
 
+                    // Reset and play video
                     video.currentTime = 0;
                     video.play().then(() => {
                         painting.material = videoMaterial;
                         activeVideo = video;
                         activePainting = painting;
                         currentCharacter = videoId;
+                    }).catch(err => {
+                        console.error('Error playing video:', err);
+                        activeVideo = null;
+                        activePainting = null;
+                        currentCharacter = null;
                     });
                 } else if (currentCharacter) {
-                    // Add AI loading message
+                    // Stop any playing video
+                    if (activeVideo) {
+                        console.log('Stopping video for new question');
+                        activeVideo.pause();
+                        if (activePainting) {
+                            activePainting.material = activePainting.userData.originalMaterial;
+                        }
+                    }
+                    
+                    // Stop any playing audio
+                    const audioElements = document.getElementsByTagName('audio');
+                    for(let audio of audioElements) {
+                        audio.pause();
+                    }
+
+                    console.log('Starting chat with:', currentCharacter);
                     const aiMessage = document.createElement('div');
                     aiMessage.className = 'chat-message ai-message';
                     chatHistory.appendChild(aiMessage);
 
-                    // Show initial loading message
-                    aiMessage.textContent = 'Thinking...';
-
                     try {
-                        const response = await fetch('http://127.0.0.1:5000/chat', {
+                        console.log('Sending request to server...');
+                        const response = await fetch('http://127.0.0.1:5001/chat', {
                             method: 'POST',
                             headers: {
                                 'Content-Type': 'application/json'
@@ -786,46 +852,54 @@
                                 question: input
                             })
                         });
+                        console.log('Got response from server:', response.status);
 
                         const reader = response.body.getReader();
                         const decoder = new TextDecoder();
-                        let fullResponse = '';
 
                         while (true) {
                             const {value, done} = await reader.read();
-                            if (done) break;
+                            if (done) {
+                                console.log('Stream complete');
+                                break;
+                            }
                             
-                            const chunk = decoder.decode(value);
-                            const lines = chunk.split('\n');
+                            const text = decoder.decode(value);
+                            console.log('Received chunk:', text);
                             
+                            const lines = text.split('\n');
                             for (const line of lines) {
+                                if (line.trim() === '') continue;
                                 if (line.startsWith('data: ')) {
-                                    const data = JSON.parse(line.slice(5));
-                                    
-                                    if (data.chunk) {
-                                        fullResponse += data.chunk;
-                                        aiMessage.textContent = fullResponse;
-                                        chatHistory.scrollTop = chatHistory.scrollHeight;
-                                    }
-                                    
-                                    if (data.error) {
-                                        aiMessage.textContent = "Error: " + data.error;
-                                        break;
-                                    }
-                                    
-                                    if (data.done) {
-                                        break;
+                                    try {
+                                        const data = JSON.parse(line.slice(5));
+                                        console.log('Parsed data:', data);
+                                        
+                                        if (data.chunk) {
+                                            aiMessage.textContent += data.chunk;
+                                            chatHistory.scrollTop = chatHistory.scrollHeight;
+                                        }
+
+                                        // Update the audio handling section:
+                                        if (data.audio) {
+                                            // Remove any existing audio elements
+                                            const audioElements = document.getElementsByTagName('audio');
+                                            for(let audio of audioElements) {
+                                                audio.remove();
+                                            }
+                                            
+                                            const audio = new Audio(`/audio/${data.audio}`);
+                                            audio.play().catch(err => console.error('Error playing audio:', err));
+                                        }
+                                    } catch (e) {
+                                        console.error('Parse error:', e, line);
                                     }
                                 }
                             }
                         }
-
-                        // Final scroll to bottom
-                        chatHistory.scrollTop = chatHistory.scrollHeight;
-
                     } catch (error) {
-                        console.error('Error:', error);
-                        aiMessage.textContent = "Error connecting to Ollama. Please try again.";
+                        console.error('Network error:', error);
+                        aiMessage.textContent = "Error connecting to the server. Please try again.";
                     }
                 } else {
                     // Add message to select a painting first
@@ -835,7 +909,6 @@
                     chatHistory.appendChild(aiMessage);
                 }
 
-                // Scroll to bottom
                 chatHistory.scrollTop = chatHistory.scrollHeight;
             }
         });
@@ -843,6 +916,11 @@
         // Update pointer lock to not lock when clicking chat input
         document.querySelector('.chat-input').addEventListener('click', function(e) {
             e.stopPropagation();
+        });
+
+        // Add this after other event listeners
+        document.querySelector('.chat-toggle').addEventListener('click', function() {
+            document.querySelector('.chat-container').classList.toggle('visible');
         });
 
         init();

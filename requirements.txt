@@ -1,3 +1,6 @@
 flask
 flask-cors
-gunicorn 
+requests
+gunicorn
+python-dotenv
+elevenlabs 
