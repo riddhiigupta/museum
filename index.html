@@ -118,6 +118,7 @@
     </style>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/PointerLockControls.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
 </head>
 <body>
     <div class="chat-container">
@@ -138,78 +139,10 @@
         let paintings = {};  // Store painting references
         let currentCharacter = null;
         const characterPrompts = {
-            'monalisa': `I am the Mona Lisa, the most famous painting in the world, created by Leonardo da Vinci between 1503-1519. Here's my complete background:
-
-Creation and History:
-- Painted by Leonardo da Vinci in Florence, Italy
-- Created between 1503 and 1519 (approximately 16 years)
-- Oil painting on a poplar wood panel
-- Size: 30 inches × 21 inches (77 cm × 53 cm)
-- Currently housed in the Louvre Museum, Paris
-- Acquired by King Francis I of France
-- Survived multiple relocations and World War II hiding
-
-My Identity:
-- Most historians believe I am Lisa Gherardini (also known as Lisa del Giocondo)
-- Born in 1479 to a Florentine silk merchant
-- Married to Francesco del Giocondo, a wealthy silk merchant
-- Mother of five children
-- The name "Mona" is a contraction of "Madonna" meaning "My lady"
-- Some scholars debate my true identity, suggesting I might be Isabella of Aragon, Cecilia Gallerani, or even da Vinci's mother
-
-Artistic Elements:
-- Famous for my enigmatic smile ("sfumato" technique)
-- Revolutionary three-quarter pose (revolutionary for its time)
-- Mysterious landscape background with winding paths and mountains
-- No visible eyebrows or eyelashes (possibly faded over time)
-- Eyes that seem to follow viewers (known as the "Mona Lisa Effect")
-- Incredibly detailed clothing and facial features
-- Perfect geometric composition and perspective
-
-Technical Innovations:
-- Leonardo's sfumato technique (subtle gradations of light and shadow)
-- Revolutionary atmospheric perspective in the background
-- Innovative use of oil paints and glazes
-- Groundbreaking portraiture techniques
-- Experimental color palettes and layering methods
-
-Cultural Impact:
-- Most visited artwork in the Louvre
-- Valued at over $850 million (insurance value)
-- Subject of countless reproductions and parodies
-- Stolen in 1911 and recovered in 1913
-- Survived vandalism attempts in 1956 and 1974
-- Inspired countless artists and movements
-- Symbol of Renaissance art and human creativity
-
-Historical Context:
-- Created during the height of the Italian Renaissance
-- Commissioned by Francesco del Giocondo
-- Represents the humanist ideals of the Renaissance
-- Never delivered to the commissioner
-- Traveled with Leonardo to France
-- Became part of the French royal collection
-
-Conservation:
-- Never been fully restored or cleaned
-- Protected by bulletproof glass
-- Maintained at constant temperature and humidity
-- Shows signs of slight warping in the poplar panel
-- Minimal cracking in the paint layer
-- Yellowed varnish affects color perception
-
-Mysteries and Debates:
-- The true meaning of my smile
-- Whether I was pregnant during the sitting
-- The identity of the landscape behind me
-- Why Leonardo kept me until his death
-- The meaning of various symbols in the painting
-- The original colors before aging
-- Whether I'm actually smiling at all
-
-Respond as if you are the Mona Lisa herself, incorporating these details naturally into your answers. Be mysterious yet knowledgeable, elegant yet approachable. Share specific dates, facts, and historical context when relevant. If asked about modern events after your creation, acknowledge your historical perspective while showing interest in how you've influenced the modern world.`,
+            'stevejobs': `I am Steve Jobs, co-founder of Apple Inc. I revolutionized personal computing, mobile phones, digital animation, and music. I co-founded Apple with Steve Wozniak in 1976 and later founded NeXT and Pixar. Known for my signature black turtleneck, "Think Different" philosophy, and legendary product presentations. I introduced groundbreaking products like the Macintosh, iMac, iPod, iPhone, and iPad. I believe in the intersection of technology and liberal arts, design excellence, and innovation.`,
 
             'starry_night': "You are the essence of Van Gogh's Starry Night painting. Respond as if you are the night sky itself, or Van Gogh describing his vision. Include details about Van Gogh's life and the painting's creation when relevant.",
+            
             'sunflowers': "You are Van Gogh's Sunflowers painting. Respond as if you are either the sunflowers themselves or Van Gogh discussing this series. Share insights about the painting's significance and Van Gogh's life in Arles."
         };
 
@@ -223,7 +156,7 @@ Respond as if you are the Mona Lisa herself, incorporating these details natural
             controls = new THREE.PointerLockControls(camera, document.body);
 
             createMuseum();
-            addPainting('images/monalisa.jpg', 0, 5, -9.9, 'monalisa');
+            addPainting('images/stevejobs.jpg', 0, 5, -9.9, 'monalisa');
             addPainting('images/starry_night.jpg', -9.9, 5, -3, 'starry_night');
             addPainting('images/sunflowers.jpg', 9.9, 5, -3, 'sunflowers');
 
@@ -244,6 +177,364 @@ Respond as if you are the Mona Lisa herself, incorporating these details natural
                 scene.add(pointLight);
             });
 
+            // Load table model
+            const loader = new THREE.GLTFLoader();
+            loader.load(
+                './table.glb',
+                function (gltf) {
+                    const tableModel = gltf.scene;
+                    
+                    // Replace the table positions with correct floor-level coordinates
+                    const tablePositions = [
+                        { pos: [-8, -2, -5], rot: 0 },  // Against left wall
+                        { pos: [1, -2, -8], rot: Math.PI / 2 },  // Against back wall
+                        { pos: [8, -2, -5], rot: 0 }   // Against right wall
+                    ];
+                    
+                    // Add tables
+                    tablePositions.forEach(({pos, rot}) => {
+                        const table = tableModel.clone();
+                        table.position.set(...pos);
+                        table.rotation.y = rot;
+                        table.scale.set(0.5, 0.5, 0.5);  // Adjusted scale
+                        scene.add(table);
+                    });
+                },
+                function (xhr) {
+                    console.log((xhr.loaded / xhr.total * 100) + '% loaded');
+                },
+                function (error) {
+                    console.error('Error loading table:', error);
+                    
+                    // Fallback to basic geometry if model fails to load
+                    const tableGeometry = new THREE.BoxGeometry(2, 1, 0.8);
+                    const tableMaterial = new THREE.MeshPhongMaterial({ color: 0x8B4513 });
+                    
+                    const tablePositions = [
+                        { pos: [0, 5, -10], rot: 0 },
+                        { pos: [0, 5, 10], rot: MATH.PI },
+                        { pos: [-10, 5, 0], rot: MATH.PI / 2 }
+                    ];
+                    
+                    tablePositions.forEach(({pos, rot}) => {
+                        const table = new THREE.Mesh(tableGeometry, tableMaterial);
+                        table.position.set(...pos);
+                        table.rotation.y = rot;
+                        scene.add(table);
+                    });
+                }
+            );
+
+            // Load Apple computers
+            const computerLoader = new THREE.GLTFLoader();
+
+            // Computer positions on the center table
+            const computerPositions = [
+                { 
+                    file: './macintosh_classic_1991.glb',
+                    pos: [0, 2, -8], 
+                    rot: 0, 
+                    scale: [4, 4, 4],
+                    name: 'Macintosh Classic'
+                },
+                { 
+                    file: './macbookair.glb',
+                    pos: [3, 1.3, -7], 
+                    rot: 0, 
+                    scale: [1, 1, 1],
+                    name: 'MacBook Air'
+                },
+                { 
+                    file: './apple_ii_computer.glb',
+                    pos: [-3, 1.3, -7], 
+                    rot: 0, 
+                    scale: [4, 4, 4],
+                    name: 'Apple II'
+                },
+                { 
+                    file: './ipad.glb',
+                    pos: [-5, 0, -5], 
+                    rot: 0, 
+                    scale: [2.5, 2.5, 2.5],
+                    name: 'iPad'
+                },
+                { 
+                    file: './iphone.glb',
+                    pos: [5.5, 1.8, -7], 
+                    rot: 0, 
+                    scale: [1, 1, 1],
+                    name: 'iPhone'
+                }
+            ];
+
+            // Load each computer
+            computerPositions.forEach(computer => {
+                computerLoader.load(
+                    computer.file,
+                    function (gltf) {
+                        const model = gltf.scene;
+                        
+                        // Position the computer
+                        model.position.set(...computer.pos);
+                        model.rotation.y = computer.rot;
+                        model.scale.set(...computer.scale);
+                        
+                        // Add shadows and lighting
+                        model.traverse((child) => {
+                            if (child.isMesh) {
+                                child.castShadow = true;
+                                child.receiveShadow = true;
+                                child.material.metalness = 0.3;
+                                child.material.roughness = 0.5;
+                            }
+                        });
+                        
+                        scene.add(model);
+                    },
+                    function (xhr) {
+                        console.log(`${computer.name} loading: ${(xhr.loaded / xhr.total * 100)}% loaded`);
+                    },
+                    function (error) {
+                        console.error(`Error loading ${computer.name}:`, error);
+                    }
+                );
+            });
+
+            // Load social media app models
+            const socialLoader = new THREE.GLTFLoader();
+
+            // Social media app positions next to left painting
+            const socialPositions = [
+                { 
+                    file: './instagram.glb',
+                    pos: [-7, 2, -4.5], 
+                    rot: 0, 
+                    scale: [0.7, 0.7, 0.7],
+                    name: 'Instagram'
+                },
+                { 
+                    file: './whatsapp.glb',
+                    pos: [-7, 1.5, -2], 
+                    rot: Math.PI / 2, 
+                    scale: [1.8, 1.8, 1.8],
+                    name: 'WhatsApp'
+                },
+                { 
+                    file: './quest.glb',
+                    pos: [-7, 1.5, 0.5], 
+                    rot: Math.PI / 2, 
+                    scale: [1.5, 1.5, 1.5],
+                    name: 'Quest'
+                },
+                { 
+                    file: './facebook.glb',
+                    pos: [-7, 1.5, -1], 
+                    rot: Math.PI / 2, 
+                    scale: [0.5, 0.5, 0.5],
+                    name: 'Facebook'
+                }
+            ];
+
+            // Load each social media app
+            socialPositions.forEach(app => {
+                socialLoader.load(
+                    app.file,
+                    function (gltf) {
+                        const model = gltf.scene;
+                        
+                        // Position the app
+                        model.position.set(...app.pos);
+                        model.rotation.y = app.rot;
+                        model.scale.set(...app.scale);
+                        
+                        // Add shadows and lighting
+                        model.traverse((child) => {
+                            if (child.isMesh) {
+                                child.castShadow = true;
+                                child.receiveShadow = true;
+                                child.material.metalness = 0.3;
+                                child.material.roughness = 0.5;
+                            }
+                        });
+                        
+                        scene.add(model);
+                    },
+                    function (xhr) {
+                        console.log(`${app.name} loading: ${(xhr.loaded / xhr.total * 100)}% loaded`);
+                    },
+                    function (error) {
+                        console.error(`Error loading ${app.name}:`, error);
+                    }
+                );
+            });
+
+            // Load tech company models
+            const techLoader = new THREE.GLTFLoader();
+
+            // Tech company positions next to right painting
+            const techPositions = [
+                { 
+                    file: './starlink_dish.glb',
+                    pos: [7, 2, -4], 
+                    rot: -Math.PI / 2, 
+                    scale: [2, 2, 2],
+                    name: 'Starlink Dish'
+                },
+                { 
+                    file: './spacex.glb',
+                    pos: [7, 1.5, -6],  // Adjusted position to be visible on right wall
+                    rot: -Math.PI / 2, 
+                    scale: [0.001, 0.001, 0.001],  // Adjusted scale to be more reasonable
+                    name: 'SpaceX Rocket'
+                },
+                { 
+                    file: './twitter.glb',
+                    pos: [10, 0.5, -2], 
+                    rot: -Math.PI / 2, 
+                    scale: [0.5, 0.5, 0.5],
+                    name: 'Twitter'
+                },
+                { 
+                    file: './cybertruck.glb',
+                    pos: [7, 0, 1.5], 
+                    rot: Math.PI / 2, 
+                    scale: [2.7, 3.5, 3.2],
+                    name: 'Cybertruck'
+                }
+            ];
+
+            // Load each tech company model
+            techPositions.forEach(tech => {
+                techLoader.load(
+                    tech.file,
+                    function (gltf) {
+                        const model = gltf.scene;
+                        
+                        // Position the model
+                        model.position.set(...tech.pos);
+                        model.rotation.y = tech.rot;
+                        model.scale.set(...tech.scale);
+                        
+                        // Add shadows and lighting
+                        model.traverse((child) => {
+                            if (child.isMesh) {
+                                child.castShadow = true;
+                                child.receiveShadow = true;
+                                child.material.metalness = 0.3;
+                                child.material.roughness = 0.5;
+                            }
+                        });
+                        
+                        scene.add(model);
+                    },
+                    function (xhr) {
+                        console.log(`${tech.name} loading: ${(xhr.loaded / xhr.total * 100)}% loaded`);
+                    },
+                    function (error) {
+                        console.error(`Error loading ${tech.name}:`, error);
+                    }
+                );
+            });
+
+            // Ceiling
+            const ceilingGeometry = new THREE.PlaneGeometry(20, 20);
+            const ceilingMaterial = new THREE.MeshStandardMaterial({ 
+                color: 0x4169E1,
+                roughness: 0.9
+            });
+            const ceiling = new THREE.Mesh(ceilingGeometry, ceilingMaterial);
+            ceiling.rotation.x = Math.PI / 2;
+            ceiling.position.y = 10;
+            scene.add(ceiling);
+
+            // Load frame model for paintings
+            const frameLoader = new THREE.GLTFLoader();
+            frameLoader.load(
+                './frame03 (1).glb',  // Make sure this matches your file name exactly
+                function (gltf) {
+                    const frameModel = gltf.scene;
+                    
+                    // Frame positions matching the paintings exactly
+                    const framePositions = [
+                        { pos: [-10.3, 5.02, -3], rot: Math.PI / 2, scale: [17, 21.5, 10.5] },     // Left painting (Starry Night)
+                        { pos: [0, 5.05, -9.8], rot: 0, scale: [17, 20, 10.5] },                   // Center painting (Steve Jobs)
+                        { pos: [10.3, 5.02, -3], rot: -Math.PI / 2, scale: [17, 21.5, 10.5] }     // Right painting (Sunflowers)
+                    ];
+                    
+                    // Add frames
+                    framePositions.forEach(({pos, rot, scale}) => {
+                        const frame = frameModel.clone();
+                        frame.position.set(...pos);
+                        frame.rotation.y = rot;
+                        frame.scale.set(...scale);
+                        
+                        // Ensure frame is visible and properly lit
+                        frame.traverse((child) => {
+                            if (child.isMesh) {
+                                child.castShadow = true;
+                                child.receiveShadow = true;
+                                child.material.metalness = 0.5;
+                                child.material.roughness = 0.7;
+                            }
+                        });
+                        
+                        scene.add(frame);
+                    });
+                },
+                // Progress callback
+                function (xhr) {
+                    console.log('Frame loading: ' + (xhr.loaded / xhr.total * 100) + '% loaded');
+                },
+                // Error callback
+                function (error) {
+                    console.error('Error loading frame:', error);
+                }
+            );
+
+            // Add door to back wall
+            const doorLoader = new THREE.GLTFLoader();
+            doorLoader.load(
+                './door.glb',  // Make sure to have this file in your project directory
+                function (gltf) {
+                    const doorModel = gltf.scene;
+                    
+                    // Position door on the back wall
+                    doorModel.position.set(-10, 3, 7); // Slightly in front of back wall
+                    doorModel.rotation.y = -Math.PI; // Face inward
+                    doorModel.scale.set(0.04, 0.05, 0.04); // Adjust size to fit wall
+                    
+                    // Add shadows and lighting to door
+                    doorModel.traverse((child) => {
+                        if (child.isMesh) {
+                            child.castShadow = true;
+                            child.receiveShadow = true;
+                            child.material.metalness = 0.3;
+                            child.material.roughness = 0.7;
+                        }
+                    });
+                    
+                    scene.add(doorModel);
+                },
+                function (xhr) {
+                    console.log('Door loading: ' + (xhr.loaded / xhr.total * 100) + '% loaded');
+                },
+                function (error) {
+                    console.error('Error loading door:', error);
+                    
+                    // Fallback: Create basic door geometry if model fails to load
+                    const doorGeometry = new THREE.BoxGeometry(2, 4, 0.2);
+                    const doorMaterial = new THREE.MeshStandardMaterial({ 
+                        color: 0x8B4513,
+                        roughness: 0.7,
+                        metalness: 0.2
+                    });
+                    const basicDoor = new THREE.Mesh(doorGeometry, doorMaterial);
+                    basicDoor.position.set(0, 2, 9.8);
+                    basicDoor.rotation.y = Math.PI;
+                    scene.add(basicDoor);
+                }
+            );
+
             document.addEventListener('keydown', onKeyDown);
             document.addEventListener('keyup', onKeyUp);
             document.addEventListener('click', onClick);
@@ -262,17 +553,6 @@ Respond as if you are the Mona Lisa herself, incorporating these details natural
             const floor = new THREE.Mesh(floorGeometry, floorMaterial);
             floor.rotation.x = -Math.PI / 2;
             scene.add(floor);
-
-            // Ceiling
-            const ceilingGeometry = new THREE.PlaneGeometry(20, 20);
-            const ceilingMaterial = new THREE.MeshStandardMaterial({ 
-                color: 0x4169E1,
-                roughness: 0.9
-            });
-            const ceiling = new THREE.Mesh(ceilingGeometry, ceilingMaterial);
-            ceiling.rotation.x = Math.PI / 2;
-            ceiling.position.y = 10;
-            scene.add(ceiling);
 
             // Walls
             const wallMaterial = new THREE.MeshStandardMaterial({ 
@@ -400,7 +680,7 @@ Respond as if you are the Mona Lisa herself, incorporating these details natural
                 direction.normalize();
 
                 if (moveForward || moveBackward) velocity.z -= direction.z * 15.0 * delta;
-                if (moveLeft || moveRight) velocity.x -= direction.x * 15.0 * delta;
+                if (moveLeft || moveRight) velocity.x -= direction.x * 25.0 * delta;
 
                 controls.moveRight(-velocity.x * delta);
                 controls.moveForward(-velocity.z * delta);
@@ -454,56 +734,105 @@ Respond as if you are the Mona Lisa herself, incorporating these details natural
                 userMessage.textContent = input;
                 chatHistory.appendChild(userMessage);
 
-                // Add AI loading message
-                const aiMessage = document.createElement('div');
-                aiMessage.className = 'chat-message ai-message';
-                chatHistory.appendChild(aiMessage);
+                // Check if it's a painting name first
+                const videoMap = {
+                    'stevejobs': 'stevejobs',
+                    'steve': 'stevejobs',
+                    'starrynight': 'starry_night',
+                    'starry': 'starry_night',
+                    'sunflowers': 'sunflowers',
+                    'sunflower': 'sunflowers'
+                };
 
-                // Show thinking animation
-                let dots = 0;
-                const loadingInterval = setInterval(() => {
-                    aiMessage.textContent = 'Thinking' + '.'.repeat(dots + 1);
-                    dots = (dots + 1) % 3;
-                    chatHistory.scrollTop = chatHistory.scrollHeight;
-                }, 500);
+                const normalizedInput = input.toLowerCase().replace(/\s+/g, '');
+                const videoId = videoMap[normalizedInput];
 
-                try {
-                    const response = await fetch('https://api.openai.com/v1/chat/completions', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'Authorization': 'Bearer YOUR_API_KEY'  // You'll need an OpenAI API key
-                        },
-                        body: JSON.stringify({
-                            model: "gpt-3.5-turbo",
-                            messages: [
-                                {role: "user", content: input}
-                            ]
-                        })
-                    });
+                if (videoId && paintings[videoId]) {
+                    // Handle video playback
+                    const painting = paintings[videoId];
+                    const { video, videoMaterial } = painting.userData;
 
-                    clearInterval(loadingInterval);
-
-                    const data = await response.json();
-                    
-                    if (data && data.response) {
-                        // Show response word by word
-                        const words = data.response.split(' ');
-                        let currentText = '';
-                        
-                        for (let word of words) {
-                            currentText += word + ' ';
-                            aiMessage.textContent = currentText;
-                            chatHistory.scrollTop = chatHistory.scrollHeight;
-                            await new Promise(resolve => setTimeout(resolve, 50));
+                    if (activeVideo && activeVideo !== video) {
+                        activeVideo.pause();
+                        if (activePainting) {
+                            activePainting.material = activePainting.userData.originalMaterial;
                         }
-                    } else {
-                        aiMessage.textContent = "No response received";
                     }
-                } catch (error) {
-                    clearInterval(loadingInterval);
-                    console.error('Error:', error);
-                    aiMessage.textContent = "Error connecting to the AI. Please try again.";
+
+                    video.currentTime = 0;
+                    video.play().then(() => {
+                        painting.material = videoMaterial;
+                        activeVideo = video;
+                        activePainting = painting;
+                        currentCharacter = videoId;
+                    });
+                } else if (currentCharacter) {
+                    // Add AI loading message
+                    const aiMessage = document.createElement('div');
+                    aiMessage.className = 'chat-message ai-message';
+                    chatHistory.appendChild(aiMessage);
+
+                    // Show initial loading message
+                    aiMessage.textContent = 'Thinking...';
+
+                    try {
+                        const response = await fetch('http://127.0.0.1:5000/chat', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify({
+                                prompt: characterPrompts[currentCharacter],
+                                question: input
+                            })
+                        });
+
+                        const reader = response.body.getReader();
+                        const decoder = new TextDecoder();
+                        let fullResponse = '';
+
+                        while (true) {
+                            const {value, done} = await reader.read();
+                            if (done) break;
+                            
+                            const chunk = decoder.decode(value);
+                            const lines = chunk.split('\n');
+                            
+                            for (const line of lines) {
+                                if (line.startsWith('data: ')) {
+                                    const data = JSON.parse(line.slice(5));
+                                    
+                                    if (data.chunk) {
+                                        fullResponse += data.chunk;
+                                        aiMessage.textContent = fullResponse;
+                                        chatHistory.scrollTop = chatHistory.scrollHeight;
+                                    }
+                                    
+                                    if (data.error) {
+                                        aiMessage.textContent = "Error: " + data.error;
+                                        break;
+                                    }
+                                    
+                                    if (data.done) {
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+
+                        // Final scroll to bottom
+                        chatHistory.scrollTop = chatHistory.scrollHeight;
+
+                    } catch (error) {
+                        console.error('Error:', error);
+                        aiMessage.textContent = "Error connecting to Ollama. Please try again.";
+                    }
+                } else {
+                    // Add message to select a painting first
+                    const aiMessage = document.createElement('div');
+                    aiMessage.className = 'chat-message ai-message';
+                    aiMessage.textContent = "Please select a painting to talk to first.";
+                    chatHistory.appendChild(aiMessage);
                 }
 
                 // Scroll to bottom
