@@ -2,11 +2,22 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Virtual Art Museum</title>
     <style>
-        body { margin: 0; }
-        canvas { display: block; }
+        html, body {
+            overflow: hidden;
+            width: 100%;
+            height: 100%;
+            margin: 0;
+            padding: 0;
+        }
+        
+        canvas {
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
         .learn-more-btn {
             position: absolute;
             padding: 8px 16px;
@@ -842,7 +853,13 @@
                     chatHistory.appendChild(aiMessage);
 
                     try {
-                        console.log('Sending request to server...');
+                        console.log('Sending request to server:', CONFIG.API_URL + '/chat');
+                        console.log('Request data:', {
+                            prompt: characterPrompts[currentCharacter],
+                            question: input,
+                            character_id: currentCharacter
+                        });
+                        
                         const response = await fetch(CONFIG.API_URL + '/chat', {
                             method: 'POST',
                             headers: {
@@ -854,7 +871,8 @@
                                 character_id: currentCharacter
                             })
                         });
-                        console.log('Got response from server:', response.status);
+                        
+                        console.log('Response status:', response.status);
 
                         const reader = response.body.getReader();
                         const decoder = new TextDecoder();
@@ -900,7 +918,7 @@
                             }
                         }
                     } catch (error) {
-                        console.error('Network error:', error);
+                        console.error('Error details:', error);
                         aiMessage.textContent = "Error connecting to the server. Please try again.";
                     }
                 } else {
