@@ -5,6 +5,8 @@ from flask_cors import CORS
 import json
 import requests
 import time
+from flask_limiter import Limiter
+import google.generativeai as genai
 
 app = Flask(__name__)
 CORS(app)
@@ -17,12 +19,17 @@ client = ElevenLabs(
     api_key=os.getenv('ELEVENLABS_API_KEY')
 )
 
+# Initialize Gemini
+genai.configure(api_key=os.getenv('GEMINI_API_KEY'))
+
 # Add this near the top of your file
 VOICE_IDS = {
     'stevejobs': "cjVigY5qzO86Huf0OWal",  # Professional male voice
     'markzuckerberg': "SOYHLrjzK2X1ezoPC6cr",  # Young male voice
     'elonmusk': "JBFqnCBsd6RMkjVDRZzb"  # Default male voice
 }
+
+limiter = Limiter(app, key_func=lambda: request.remote_addr)
 
 @app.route('/')
 def home():
@@ -59,6 +66,7 @@ def text_to_speech(text, character_id):
         return None
 
 @app.route('/chat', methods=['POST'])
+@limiter.limit("20 per day")  # Adjust as needed
 def chat():
     print("\n" + "="*50)
     print("NEW CHAT REQUEST RECEIVED")
@@ -66,105 +74,71 @@ def chat():
     data = request.json
     prompt = data.get('prompt', '')
     question = data.get('question', '')
+    character_id = data.get('character_id', 'stevejobs')
     print(f"\nPROMPT: {prompt[:100]}...")
     print(f"QUESTION: {question}")
     print("="*50)
 
     def generate():
         try:
-            # Modified prompt to prevent self-conversation
-            full_prompt = f"""<<SYS>>
-You are {prompt}
-IMPORTANT: Give ONE direct answer to the user's question. Keep it under 2 sentences.
-DO NOT ask questions back. DO NOT continue the conversation.
-<</SYS>>
-
-Question: {question}
-Answer (2 sentences max):"""
-
-            print("\nSending request to Ollama...")
+            # Use Gemini API
+            model = genai.GenerativeModel('gemini-pro')
+            system_prompt = f"You are {prompt}. IMPORTANT: Give ONE direct answer to the user's question. Keep it under 2 sentences. DO NOT ask questions back. DO NOT continue the conversation."
             
-            response = requests.post(
-                'http://localhost:11434/api/generate',
-                json={
-                    'model': 'mistral',
-                    'prompt': full_prompt,
-                    'stream': True,
-                    'options': {
-                        'temperature': 0.7,
-                        'top_p': 0.9,
-                        'max_tokens': 50,
-                        'stop': ["\n", ".", "!", "?"]
-                    }
-                },
-                stream=True,
-                timeout=30
+            response = model.generate_content(
+                [
+                    {"role": "system", "parts": [system_prompt]},
+                    {"role": "user", "parts": [question]}
+                ],
+                generation_config={
+                    "max_output_tokens": 50,
+                    "temperature": 0.7,
+                }
             )
             
-            print("Connected to Ollama successfully")
-            current_sentence = ""
+            answer = response.text.strip()
+            print(f"Response: {answer}")
             
-            for line in response.iter_lines():
-                if line:
-                    try:
-                        json_response = json.loads(line)
-                        if 'response' in json_response:
-                            chunk = json_response['response']
-                            current_sentence += chunk
-                            print(f"\rCollecting response: {current_sentence}", end="", flush=True)
-                            yield f"data: {json.dumps({'chunk': chunk})}\n\n"
-
-                        if json_response.get('done'):
-                            print("\n\n" + "="*50)
-                            print("GENERATING AUDIO")
-                            print("="*50)
-                            print(f"Text to convert: '{current_sentence}'")
-                            
-                            try:
-                                api_key = os.getenv('ELEVENLABS_API_KEY')
-                                print(f"\nUsing API key: {api_key[:10]}...")
-                                print("Making request to ElevenLabs...")
-                                
-                                audio_data = client.text_to_speech.convert(
-                                    text=current_sentence,
-                                    voice_id="JBFqnCBsd6RMkjVDRZzb",
-                                    model_id="eleven_multilingual_v2",
-                                    output_format="mp3_44100_128"
-                                )
-                                
-                                print(f"\nAudio data received: {type(audio_data)}")
-                                print(f"Audio data length: {len(audio_data) if audio_data else 'None'}")
-                                
-                                if audio_data:
-                                    timestamp = int(time.time() * 1000)
-                                    audio_path = f"audio_chunk_{timestamp}.mp3"
-                                    audio_full_path = os.path.join('audio', audio_path)
-                                    print(f"\nSaving audio to: {audio_full_path}")
-                                    
-                                    with open(audio_full_path, 'wb') as f:
-                                        f.write(audio_data)
-                                    print("✓ Audio file saved successfully")
-                                    print("="*50)
-                                    
-                                    yield f"data: {json.dumps({'audio': audio_path})}\n\n"
-                                else:
-                                    print("\n❌ ERROR: No audio data received from ElevenLabs")
-                                    print("="*50)
-                            except Exception as e:
-                                print("\n❌ SPEECH GENERATION ERROR")
-                                print(f"Error type: {type(e)}")
-                                print(f"Error message: {str(e)}")
-                                print("\nFull traceback:")
-                                import traceback
-                                print(traceback.format_exc())
-                                print("="*50)
-
-                            yield f"data: {json.dumps({'done': True})}\n\n"
-                            
-                    except Exception as e:
-                        print(f"\n❌ Parse error: {e}")
-                        yield f"data: {json.dumps({'error': 'Parse error'})}\n\n"
-
+            # Send the answer in chunks to simulate streaming
+            for i in range(0, len(answer), 3):
+                chunk = answer[i:i+3]
+                yield f"data: {json.dumps({'chunk': chunk})}\n\n"
+                time.sleep(0.05)  # Small delay to simulate streaming
+            
+            # Generate audio with ElevenLabs
+            try:
+                voice_id = VOICE_IDS.get(character_id, "JBFqnCBsd6RMkjVDRZzb")
+                url = f"https://api.elevenlabs.io/v1/text-to-speech/{voice_id}"
+                
+                headers = {
+                    "xi-api-key": os.getenv('ELEVENLABS_API_KEY'),
+                    "Content-Type": "application/json"
+                }
+                
+                data = {
+                    "text": answer,
+                    "model_id": "eleven_multilingual_v2"
+                }
+                
+                print("Making request to ElevenLabs...")
+                audio_response = requests.post(url, json=data, headers=headers)
+                audio_response.raise_for_status()
+                
+                audio_data = audio_response.content
+                timestamp = int(time.time() * 1000)
+                audio_path = f"audio_chunk_{timestamp}.mp3"
+                audio_full_path = os.path.join('audio', audio_path)
+                
+                with open(audio_full_path, 'wb') as f:
+                    f.write(audio_data)
+                print("✓ Audio file saved successfully")
+                
+                yield f"data: {json.dumps({'audio': audio_path})}\n\n"
+            except Exception as e:
+                print(f"Audio generation error: {str(e)}")
+            
+            yield f"data: {json.dumps({'done': True})}\n\n"
+                
         except Exception as e:
             print(f"\n❌ API Error: {e}")
             yield f"data: {json.dumps({'error': str(e)})}\n\n"

@@ -159,6 +159,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/PointerLockControls.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+    <script src="static/config.js"></script>
 </head>
 <body>
     <button class="chat-toggle">
@@ -842,14 +843,15 @@
 
                     try {
                         console.log('Sending request to server...');
-                        const response = await fetch('http://127.0.0.1:5001/chat', {
+                        const response = await fetch(CONFIG.API_URL + '/chat', {
                             method: 'POST',
                             headers: {
                                 'Content-Type': 'application/json'
                             },
                             body: JSON.stringify({
                                 prompt: characterPrompts[currentCharacter],
-                                question: input
+                                question: input,
+                                character_id: currentCharacter
                             })
                         });
                         console.log('Got response from server:', response.status);
