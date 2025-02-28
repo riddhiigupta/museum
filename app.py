@@ -90,61 +90,65 @@ def chat():
             # Use Gemini API
             model = genai.GenerativeModel('gemini-pro')
             
-            # Simplified prompt structure
-            prompt_text = f"You are {prompt}. Answer this question briefly in 1-2 sentences: {question}"
+            try:
+                # Simplified prompt structure with safety settings
+                response = model.generate_content(
+                    f"You are {prompt}. Answer this question briefly in 1-2 sentences: {question}",
+                    generation_config={
+                        "temperature": 0.7,
+                        "max_output_tokens": 100,
+                    }
+                )
+                
+                answer = response.text.strip()
+                print(f"Response: {answer}")
+            except Exception as e:
+                print(f"Gemini API error: {str(e)}")
+                answer = "Sorry, I couldn't process your request at this time."
             
-            response = model.generate_content(prompt_text)
+            # Send the answer in chunks to simulate streaming
+            for i in range(0, len(answer), 3):
+                chunk = answer[i:i+3]
+                yield f"data: {json.dumps({'chunk': chunk})}\n\n"
+                time.sleep(0.05)  # Small delay to simulate streaming
             
-            answer = response.text.strip()
+            # Generate audio with ElevenLabs
+            try:
+                voice_id = VOICE_IDS.get(character_id, "JBFqnCBsd6RMkjVDRZzb")
+                url = f"https://api.elevenlabs.io/v1/text-to-speech/{voice_id}"
+                
+                headers = {
+                    "xi-api-key": os.getenv('ELEVENLABS_API_KEY'),
+                    "Content-Type": "application/json"
+                }
+                
+                data = {
+                    "text": answer,
+                    "model_id": "eleven_multilingual_v2"
+                }
+                
+                print("Making request to ElevenLabs...")
+                audio_response = requests.post(url, json=data, headers=headers)
+                audio_response.raise_for_status()
+                
+                audio_data = audio_response.content
+                timestamp = int(time.time() * 1000)
+                audio_path = f"audio_chunk_{timestamp}.mp3"
+                audio_full_path = os.path.join('audio', audio_path)
+                
+                with open(audio_full_path, 'wb') as f:
+                    f.write(audio_data)
+                print("✓ Audio file saved successfully")
+                
+                yield f"data: {json.dumps({'audio': audio_path})}\n\n"
+            except Exception as e:
+                print(f"Audio generation error: {str(e)}")
+            
+            yield f"data: {json.dumps({'done': True})}\n\n"
+            
         except Exception as e:
-            print(f"Gemini API error: {str(e)}")
-            answer = "Sorry, I couldn't process your request at this time."
-        
-        print(f"Response: {answer}")
-        
-        # Send the answer in chunks to simulate streaming
-        for i in range(0, len(answer), 3):
-            chunk = answer[i:i+3]
-            yield f"data: {json.dumps({'chunk': chunk})}\n\n"
-            time.sleep(0.05)  # Small delay to simulate streaming
-        
-        # Generate audio with ElevenLabs
-        try:
-            voice_id = VOICE_IDS.get(character_id, "JBFqnCBsd6RMkjVDRZzb")
-            url = f"https://api.elevenlabs.io/v1/text-to-speech/{voice_id}"
-            
-            headers = {
-                "xi-api-key": os.getenv('ELEVENLABS_API_KEY'),
-                "Content-Type": "application/json"
-            }
-            
-            data = {
-                "text": answer,
-                "model_id": "eleven_multilingual_v2"
-            }
-            
-            print("Making request to ElevenLabs...")
-            audio_response = requests.post(url, json=data, headers=headers)
-            audio_response.raise_for_status()
-            
-            audio_data = audio_response.content
-            timestamp = int(time.time() * 1000)
-            audio_path = f"audio_chunk_{timestamp}.mp3"
-            audio_full_path = os.path.join('audio', audio_path)
-            
-            with open(audio_full_path, 'wb') as f:
-                f.write(audio_data)
-            print("✓ Audio file saved successfully")
-            
-            yield f"data: {json.dumps({'audio': audio_path})}\n\n"
-        except Exception as e:
-            print(f"Audio generation error: {str(e)}")
-        
-        yield f"data: {json.dumps({'done': True})}\n\n"
-            
-    except Exception as e:
-        print(f"\n❌ API Error: {e}")
-        yield f"data: {json.dumps({'error': str(e)})}\n\n"
+            print(f"\n❌ API Error: {e}")
+            yield f"data: {json.dumps({'error': str(e)})}\n\n"
 
     return Response(stream_with_context(generate()), mimetype='text/event-stream')
 

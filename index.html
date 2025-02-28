@@ -11,12 +11,16 @@
             height: 100%;
             margin: 0;
             padding: 0;
+            touch-action: none;
         }
         
         canvas {
-            width: 100%;
-            height: 100%;
+            width: 100% !important;
+            height: 100% !important;
             display: block;
+            position: fixed;
+            top: 0;
+            left: 0;
         }
         .learn-more-btn {
             position: absolute;
@@ -216,6 +220,7 @@
         document.body.appendChild(renderer.domElement);
 
             controls = new THREE.PointerLockControls(camera, document.body);
+            controls.pointerSpeed = 0.8;
 
             createMuseum();
             addPainting('images/stevejobs.jpg', 0, 5, -9.9, 'stevejobs');
@@ -731,8 +736,8 @@
                 direction.x = Number(moveRight) - Number(moveLeft);
                 direction.normalize();
 
-                if (moveForward || moveBackward) velocity.z -= direction.z * 15.0 * delta;
-                if (moveLeft || moveRight) velocity.x -= direction.x * 25.0 * delta;
+                if (moveForward || moveBackward) velocity.z -= direction.z * 30.0 * delta;
+                if (moveLeft || moveRight) velocity.x -= direction.x * 40.0 * delta;
 
                 controls.moveRight(-velocity.x * delta);
                 controls.moveForward(-velocity.z * delta);
