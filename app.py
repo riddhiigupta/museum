@@ -9,7 +9,7 @@ from flask_limiter import Limiter
 import google.generativeai as genai
 
 app = Flask(__name__)
-CORS(app)
+CORS(app, resources={r"/*": {"origins": "*"}}, supports_credentials=True)
 
 # Create audio directory if it doesn't exist
 os.makedirs('audio', exist_ok=True)
@@ -29,7 +29,10 @@ VOICE_IDS = {
     'elonmusk': "JBFqnCBsd6RMkjVDRZzb"  # Default male voice
 }
 
-limiter = Limiter(app, key_func=lambda: request.remote_addr)
+limiter = Limiter(
+    key_func=lambda: request.remote_addr,
+    app=app
+)
 
 @app.route('/')
 def home():
@@ -85,18 +88,23 @@ def chat():
             model = genai.GenerativeModel('gemini-pro')
             system_prompt = f"You are {prompt}. IMPORTANT: Give ONE direct answer to the user's question. Keep it under 2 sentences. DO NOT ask questions back. DO NOT continue the conversation."
             
-            response = model.generate_content(
-                [
-                    {"role": "system", "parts": [system_prompt]},
-                    {"role": "user", "parts": [question]}
-                ],
-                generation_config={
-                    "max_output_tokens": 50,
-                    "temperature": 0.7,
-                }
-            )
+            try:
+                response = model.generate_content(
+                    [
+                        {"role": "system", "parts": [system_prompt]},
+                        {"role": "user", "parts": [question]}
+                    ],
+                    generation_config={
+                        "max_output_tokens": 50,
+                        "temperature": 0.7,
+                    }
+                )
+                
+                answer = response.text.strip()
+            except Exception as e:
+                print(f"Gemini API error: {str(e)}")
+                answer = "Sorry, I couldn't process your request at this time."
             
-            answer = response.text.strip()
             print(f"Response: {answer}")
             
             # Send the answer in chunks to simulate streaming
@@ -186,6 +194,10 @@ def test_audio():
     except Exception as e:
         print(f"❌ Error: {str(e)}")
         return jsonify({"error": str(e)}), 500
+
+@app.route('/health', methods=['GET'])
+def health_check():
+    return jsonify({"status": "healthy"}), 200
 
 if __name__ == "__main__":
     app.run(host='127.0.0.1', port=5001, debug=True)
