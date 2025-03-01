@@ -6,7 +6,7 @@ import json
 import requests
 import time
 from flask_limiter import Limiter
-from google import genai  # Updated import
+import google.generativeai as genai
 
 app = Flask(__name__)
 CORS(app, resources={r"/*": {"origins": "*"}}, 
@@ -66,17 +66,14 @@ def chat():
     def generate():
         try:
             # Use the new Gemini API client
-            gemini_client = genai.Client(api_key=os.getenv('GEMINI_API_KEY'))
+            model = genai.GenerativeModel('gemini-1.5-flash')
             
             try:
                 # Create the prompt with character context
                 full_prompt = f"You are {prompt}. Answer this question briefly in 1-2 sentences: {question}"
                 
-                # Generate content with the new API
-                response = gemini_client.models.generate_content(
-                    model="gemini-1.5-flash",  # Using the latest model
-                    contents=full_prompt
-                )
+                # Generate content with the API
+                response = model.generate_content(full_prompt)
                 
                 answer = response.text.strip()
                 print(f"Response: {answer}")
