@@ -1,0 +1,8 @@
+flask
+flask-cors
+requests
+gunicorn
+python-dotenv
+elevenlabs
+flask-limiter
+google-generativeai==0.8.0 

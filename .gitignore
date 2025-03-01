@@ -1,0 +1,16 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+env/
+
+# Environment variables
+.env
+
+# Audio files
+audio/
+audio_chunk_*.mp3
+
+# OS files
+.DS_Store 

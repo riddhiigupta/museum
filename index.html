@@ -1,0 +1,954 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Virtual Art Museum</title>
+    <style>
+        html, body {
+            overflow: hidden;
+            width: 100%;
+            height: 100%;
+            margin: 0;
+            padding: 0;
+            touch-action: none;
+        }
+        
+        canvas {
+            width: 100% !important;
+            height: 100% !important;
+            display: block;
+            position: fixed;
+            top: 0;
+            left: 0;
+        }
+        .learn-more-btn {
+            position: absolute;
+            padding: 8px 16px;
+            background: rgba(65, 105, 225, 0.8);
+            color: white;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            font-family: Arial, sans-serif;
+            width: 120px;
+            height: 35px;
+            text-align: center;
+            white-space: nowrap;
+            line-height: 20px;
+            transform-origin: center;
+            user-select: none;
+            z-index: 1000;
+            transition: all 0.3s;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+        }
+
+        .learn-more-btn:hover {
+            background: rgba(65, 105, 225, 1);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+        }
+
+        canvas {
+            cursor: default;  /* Default cursor */
+        }
+        
+        canvas.clickable {
+            cursor: pointer !important;  /* Show pointing hand when hovering over paintings */
+        }
+
+        .chat-container {
+            position: fixed;
+            bottom: 5px;
+            left: 50%;
+            transform: translateX(-50%) translateY(200%);
+            width: 80%;
+            z-index: 1000;
+            background: rgb(255, 93, 123);
+            padding: 5px;
+            border-radius: 30px;
+            display: flex;
+            flex-direction: column;
+            gap: 3px;
+            pointer-events: auto;
+            height: 150px;
+            justify-content: center;  /* Center content vertically */
+            align-items: center;  /* Center content horizontally */
+        }
+
+        .chat-container.visible {
+            transform: translateX(-50%) translateY(0);
+        }
+
+        .chat-history {
+            width: 95%;
+            padding: 8px 15px;
+            border: none;
+            border-radius: 20px;
+            background: rgba(0, 0, 0, 0.3);
+            color: white;
+            font-size: 16px;
+            box-sizing: border-box;
+            height: 80px;
+            overflow-y: auto;  /* Allow scrolling */
+            white-space: normal;  /* Allow text wrapping */
+            text-overflow: unset;
+            display: flex;
+            flex-direction: column;  /* Stack messages */
+        }
+
+        .chat-message {
+            display: block !important;  /* Override the display: none */
+            margin: 2px 0;
+            padding: 4px 8px;
+            border-radius: 10px;
+            font-size: 14px;
+        }
+
+        .user-message {
+            display: block !important;
+            background: rgba(65, 105, 225, 0.3);
+            margin-left: auto;
+            max-width: 85%;
+        }
+
+        .ai-message {
+            display: block !important;
+            background: rgba(255, 255, 255, 0.1);
+            margin-right: auto;
+            max-width: 85%;
+        }
+
+        .chat-input {
+            width: 95%;  /* Match history width */
+            padding: 8px 15px;
+            border: none;
+            border-radius: 100px;
+            background: rgba(255, 255, 255, 0.9);
+            color: #000;
+            font-size: 16px;
+            box-sizing: border-box;
+            height: 35px;
+            margin-bottom: 5px;  /* Space from bottom */
+        }
+
+        /* Remove old message styles since we're not using them anymore */
+        .chat-message, .user-message, .ai-message {
+            display: none;
+        }
+
+        .chat-toggle {
+            position: fixed;
+            bottom: 20px;
+            left: 20px;
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            background: rgb(255, 60, 119);
+            border: none;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+            z-index: 1001;
+            transition: transform 0.2s;
+        }
+
+        .chat-toggle:hover {
+            transform: scale(1.1);
+        }
+
+        .chat-toggle svg {
+            width: 24px;
+            height: 24px;
+            fill: white;
+        }
+
+        .input-section {
+            width: 100%;
+            display: flex;
+            justify-content: center;  /* Center input horizontally */
+        }
+    </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/PointerLockControls.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+    <script src="static/config.js"></script>
+</head>
+<body>
+    <button class="chat-toggle">
+        <svg viewBox="0 0 24 24">
+            <path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 14H6l-2 2V4h16v12z"/>
+        </svg>
+    </button>
+    <div class="chat-container">
+        <div class="chat-history">
+            <!-- Messages will appear here -->
+        </div>
+        <div class="input-section">
+            <input type="text" class="chat-input" placeholder="Ask a question or type painting name...">
+    </div>
+    </div>
+    <script>
+        let camera, scene, renderer, controls;
+        let moveForward = false;
+        let moveBackward = false;
+        let moveLeft = false;
+        let moveRight = false;
+        let velocity = new THREE.Vector3();
+        let direction = new THREE.Vector3();
+        let prevTime = performance.now();
+        let activeVideo = null;
+        let activePainting = null;
+        let paintings = {};  // Store painting references
+        let currentCharacter = null;
+        let isInitialSelection = true;
+        const characterPrompts = {
+            'stevejobs': `I am Steve Jobs, co-founder of Apple Inc. I revolutionized personal computing, mobile phones, digital animation, and music. I co-founded Apple with Steve Wozniak in 1976 and later founded NeXT and Pixar. Known for my signature black turtleneck, "Think Different" philosophy, and legendary product presentations. I introduced groundbreaking products like the Macintosh, iMac, iPod, iPhone, and iPad. I believe in the intersection of technology and liberal arts, design excellence, and innovation.`,
+
+            'markzuckerberg': "You are Mark Zuckerberg, co-founder and CEO of Meta (formerly Facebook). Respond as Mark, discussing your journey from creating Facebook in a Harvard dorm room to building a social media empire. Share insights about Meta's vision for the metaverse and connecting people globally.",
+            
+            'elonmusk': "You are Elon Musk, CEO of Tesla, SpaceX, and X (formerly Twitter). Respond as Elon, discussing your vision for sustainable energy, space exploration, and technological innovation. Share insights about electric vehicles, Mars colonization, and your various ventures in advancing human civilization."
+        };
+
+        function init() {
+            scene = new THREE.Scene();
+            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+            renderer = new THREE.WebGLRenderer();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        document.body.appendChild(renderer.domElement);
+
+            controls = new THREE.PointerLockControls(camera, document.body);
+            controls.pointerSpeed = 0.8;
+
+            createMuseum();
+            addPainting('images/stevejobs.jpg', 0, 5, -9.9, 'stevejobs');
+            addPainting('images/markzuckerberg.jpg', -9.9, 5, -3, 'markzuckerberg');
+            addPainting('images/elonmusk.jpg', 9.9, 5, -3, 'elonmusk');
+
+            camera.position.set(0, 5, 8);
+
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+            scene.add(ambientLight);
+
+            const lights = [
+                { position: [0, 8, 0], intensity: 0.5 },
+                { position: [-5, 8, -5], intensity: 0.4 },
+                { position: [5, 8, -5], intensity: 0.4 }
+            ];
+
+            lights.forEach(light => {
+                const pointLight = new THREE.PointLight(0xffffff, light.intensity);
+                pointLight.position.set(...light.position);
+                scene.add(pointLight);
+            });
+
+            // Load table model
+            const loader = new THREE.GLTFLoader();
+            loader.load(
+                './table.glb',
+                function (gltf) {
+                    const tableModel = gltf.scene;
+                    
+                    // Replace the table positions with correct floor-level coordinates
+                    const tablePositions = [
+                        { pos: [-8, -2, -5], rot: 0 },  // Against left wall
+                        { pos: [1, -2, -8], rot: Math.PI / 2 },  // Against back wall
+                        { pos: [8, -2, -5], rot: 0 }   // Against right wall
+                    ];
+                    
+                    // Add tables
+                    tablePositions.forEach(({pos, rot}) => {
+                        const table = tableModel.clone();
+                        table.position.set(...pos);
+                        table.rotation.y = rot;
+                        table.scale.set(0.5, 0.5, 0.5);  // Adjusted scale
+                        scene.add(table);
+                    });
+                },
+                function (xhr) {
+                    console.log((xhr.loaded / xhr.total * 100) + '% loaded');
+                },
+                function (error) {
+                    console.error('Error loading table:', error);
+                    
+                    // Fallback to basic geometry if model fails to load
+                    const tableGeometry = new THREE.BoxGeometry(2, 1, 0.8);
+                    const tableMaterial = new THREE.MeshPhongMaterial({ color: 0x8B4513 });
+                    
+                    const tablePositions = [
+                        { pos: [0, 5, -10], rot: 0 },
+                        { pos: [0, 5, 10], rot: MATH.PI },
+                        { pos: [-10, 5, 0], rot: MATH.PI / 2 }
+                    ];
+                    
+                    tablePositions.forEach(({pos, rot}) => {
+                        const table = new THREE.Mesh(tableGeometry, tableMaterial);
+                        table.position.set(...pos);
+                        table.rotation.y = rot;
+                        scene.add(table);
+                    });
+                }
+            );
+
+            // Load Apple computers
+            const computerLoader = new THREE.GLTFLoader();
+
+            // Computer positions on the center table
+            const computerPositions = [
+                { 
+                    file: './macintosh_classic_1991.glb',
+                    pos: [0, 2, -8], 
+                    rot: 0, 
+                    scale: [4, 4, 4],
+                    name: 'Macintosh Classic'
+                },
+                { 
+                    file: './macbookair.glb',
+                    pos: [3, 1.3, -7], 
+                    rot: 0, 
+                    scale: [1, 1, 1],
+                    name: 'MacBook Air'
+                },
+                { 
+                    file: './apple_ii_computer.glb',
+                    pos: [-3, 1.3, -7], 
+                    rot: 0, 
+                    scale: [4, 4, 4],
+                    name: 'Apple II'
+                },
+                { 
+                    file: './iphone.glb',
+                    pos: [5.5, 1.8, -7], 
+                    rot: 0, 
+                    scale: [1, 1, 1],
+                    name: 'iPhone'
+                }
+            ];
+
+            // Load each computer
+            computerPositions.forEach(computer => {
+                computerLoader.load(
+                    computer.file,
+                    function (gltf) {
+                        const model = gltf.scene;
+                        
+                        // Position the computer
+                        model.position.set(...computer.pos);
+                        model.rotation.y = computer.rot;
+                        model.scale.set(...computer.scale);
+                        
+                        // Add shadows and lighting
+                        model.traverse((child) => {
+                            if (child.isMesh) {
+                                child.castShadow = true;
+                                child.receiveShadow = true;
+                                child.material.metalness = 0.3;
+                                child.material.roughness = 0.5;
+                            }
+                        });
+                        
+                        scene.add(model);
+                    },
+                    function (xhr) {
+                        console.log(`${computer.name} loading: ${(xhr.loaded / xhr.total * 100)}% loaded`);
+                    },
+                    function (error) {
+                        console.error(`Error loading ${computer.name}:`, error);
+                    }
+                );
+            });
+
+            // Load social media app models
+            const socialLoader = new THREE.GLTFLoader();
+
+            // Social media app positions next to left painting
+            const socialPositions = [
+                { 
+                    file: './instagram.glb',
+                    pos: [-7, 2, -4.5], 
+                    rot: 0, 
+                    scale: [0.7, 0.7, 0.7],
+                    name: 'Instagram'
+                },
+                { 
+                    file: './whatsapp.glb',
+                    pos: [-7, 1.5, -2], 
+                    rot: Math.PI / 2, 
+                    scale: [1.8, 1.8, 1.8],
+                    name: 'WhatsApp'
+                },
+                { 
+                    file: './quest.glb',
+                    pos: [-7, 1.5, 0.5], 
+                    rot: Math.PI / 2, 
+                    scale: [1.5, 1.5, 1.5],
+                    name: 'Quest'
+                },
+                { 
+                    file: './facebook.glb',
+                    pos: [-7, 1.5, -1], 
+                    rot: Math.PI / 2, 
+                    scale: [0.5, 0.5, 0.5],
+                    name: 'Facebook'
+                }
+            ];
+
+            // Load each social media app
+            socialPositions.forEach(app => {
+                socialLoader.load(
+                    app.file,
+                    function (gltf) {
+                        const model = gltf.scene;
+                        
+                        // Position the app
+                        model.position.set(...app.pos);
+                        model.rotation.y = app.rot;
+                        model.scale.set(...app.scale);
+                        
+                        // Add shadows and lighting
+                        model.traverse((child) => {
+                            if (child.isMesh) {
+                                child.castShadow = true;
+                                child.receiveShadow = true;
+                                child.material.metalness = 0.3;
+                                child.material.roughness = 0.5;
+                            }
+                        });
+                        
+                        scene.add(model);
+                    },
+                    function (xhr) {
+                        console.log(`${app.name} loading: ${(xhr.loaded / xhr.total * 100)}% loaded`);
+                    },
+                    function (error) {
+                        console.error(`Error loading ${app.name}:`, error);
+                    }
+                );
+            });
+
+            // Load tech company models
+            const techLoader = new THREE.GLTFLoader();
+
+            // Tech company positions next to right painting
+            const techPositions = [
+                { 
+                    file: './starlink_dish.glb',
+                    pos: [7, 2, -4], 
+                    rot: -Math.PI / 2, 
+                    scale: [2, 2, 2],
+                    name: 'Starlink Dish'
+                },
+                { 
+                    file: './spacex.glb',
+                    pos: [7, 1.5, -6],  // Adjusted position to be visible on right wall
+                    rot: -Math.PI / 2, 
+                    scale: [0.001, 0.001, 0.001],  // Adjusted scale to be more reasonable
+                    name: 'SpaceX Rocket'
+                },
+                { 
+                    file: './twitter.glb',
+                    pos: [10, 0.5, -2], 
+                    rot: -Math.PI / 2, 
+                    scale: [0.5, 0.5, 0.5],
+                    name: 'Twitter'
+                },
+                { 
+                    file: './cybertruck.glb',
+                    pos: [7, 0, 1.5], 
+                    rot: Math.PI / 2, 
+                    scale: [2.7, 3.5, 3.2],
+                    name: 'Cybertruck'
+                }
+            ];
+
+            // Load each tech company model
+            techPositions.forEach(tech => {
+                techLoader.load(
+                    tech.file,
+                    function (gltf) {
+                        const model = gltf.scene;
+                        
+                        // Position the model
+                        model.position.set(...tech.pos);
+                        model.rotation.y = tech.rot;
+                        model.scale.set(...tech.scale);
+                        
+                        // Add shadows and lighting
+                        model.traverse((child) => {
+                            if (child.isMesh) {
+                                child.castShadow = true;
+                                child.receiveShadow = true;
+                                child.material.metalness = 0.3;
+                                child.material.roughness = 0.5;
+                            }
+                        });
+                        
+                        scene.add(model);
+                    },
+                    function (xhr) {
+                        console.log(`${tech.name} loading: ${(xhr.loaded / xhr.total * 100)}% loaded`);
+                    },
+                    function (error) {
+                        console.error(`Error loading ${tech.name}:`, error);
+                    }
+                );
+            });
+
+            // Ceiling
+            const ceilingGeometry = new THREE.PlaneGeometry(20, 20);
+            const ceilingMaterial = new THREE.MeshStandardMaterial({ 
+                color: 0x4169E1,
+                roughness: 0.9
+            });
+            const ceiling = new THREE.Mesh(ceilingGeometry, ceilingMaterial);
+            ceiling.rotation.x = Math.PI / 2;
+            ceiling.position.y = 10;
+            scene.add(ceiling);
+
+            // Load frame model for paintings
+            const frameLoader = new THREE.GLTFLoader();
+            frameLoader.load(
+                './frame03 (1).glb',  // Make sure this matches your file name exactly
+                function (gltf) {
+                    const frameModel = gltf.scene;
+                    
+                    // Frame positions matching the paintings exactly
+                    const framePositions = [
+                        { pos: [-10.3, 5.02, -3], rot: Math.PI / 2, scale: [17, 21.5, 10.5] },     // Left painting (Mark Zuckerberg)
+                        { pos: [0, 5.05, -9.8], rot: 0, scale: [17, 20, 10.5] },                   // Center painting (Steve Jobs)
+                        { pos: [10.3, 5.02, -3], rot: -Math.PI / 2, scale: [17, 21.5, 10.5] }     // Right painting (Elon Musk)
+                    ];
+                    
+                    // Add frames
+                    framePositions.forEach(({pos, rot, scale}) => {
+                        const frame = frameModel.clone();
+                        frame.position.set(...pos);
+                        frame.rotation.y = rot;
+                        frame.scale.set(...scale);
+                        
+                        // Ensure frame is visible and properly lit
+                        frame.traverse((child) => {
+                            if (child.isMesh) {
+                                child.castShadow = true;
+                                child.receiveShadow = true;
+                                child.material.metalness = 0.5;
+                                child.material.roughness = 0.7;
+                            }
+                        });
+                        
+                        scene.add(frame);
+                    });
+                },
+                // Progress callback
+                function (xhr) {
+                    console.log('Frame loading: ' + (xhr.loaded / xhr.total * 100) + '% loaded');
+                },
+                // Error callback
+                function (error) {
+                    console.error('Error loading frame:', error);
+                }
+            );
+
+            // Add door to back wall
+            const doorLoader = new THREE.GLTFLoader();
+            doorLoader.load(
+                './door.glb',  // Make sure to have this file in your project directory
+                function (gltf) {
+                    const doorModel = gltf.scene;
+                    
+                    // Position door on the back wall
+                    doorModel.position.set(-10, 3, 7); // Slightly in front of back wall
+                    doorModel.rotation.y = -Math.PI; // Face inward
+                    doorModel.scale.set(0.04, 0.05, 0.04); // Adjust size to fit wall
+                    
+                    // Add shadows and lighting to door
+                    doorModel.traverse((child) => {
+                        if (child.isMesh) {
+                            child.castShadow = true;
+                            child.receiveShadow = true;
+                            child.material.metalness = 0.3;
+                            child.material.roughness = 0.7;
+                        }
+                    });
+                    
+                    scene.add(doorModel);
+                },
+                function (xhr) {
+                    console.log('Door loading: ' + (xhr.loaded / xhr.total * 100) + '% loaded');
+                },
+                function (error) {
+                    console.error('Error loading door:', error);
+                    
+                    // Fallback: Create basic door geometry if model fails to load
+                    const doorGeometry = new THREE.BoxGeometry(2, 4, 0.2);
+                    const doorMaterial = new THREE.MeshStandardMaterial({ 
+                        color: 0x8B4513,
+                        roughness: 0.7,
+                        metalness: 0.2
+                    });
+                    const basicDoor = new THREE.Mesh(doorGeometry, doorMaterial);
+                    basicDoor.position.set(0, 2, 9.8);
+                    basicDoor.rotation.y = Math.PI;
+                    scene.add(basicDoor);
+                }
+            );
+
+            document.addEventListener('keydown', onKeyDown);
+            document.addEventListener('keyup', onKeyUp);
+            document.addEventListener('click', onClick);
+            
+            animate();
+        }
+
+        function createMuseum() {
+            // Floor
+            const floorGeometry = new THREE.PlaneGeometry(20, 20);
+            const floorMaterial = new THREE.MeshStandardMaterial({ 
+                color: 0xFFBD59,  // Changed to Light Yellow (Lemon Chiffon)
+                roughness: 0.7,
+                metalness: 0.1
+            });
+        const floor = new THREE.Mesh(floorGeometry, floorMaterial);
+        floor.rotation.x = -Math.PI / 2;
+        scene.add(floor);
+
+            // Walls
+            const wallMaterial = new THREE.MeshStandardMaterial({ 
+                color: 0x4169E1,
+                roughness: 0.7
+            });
+
+            const walls = [
+                { 
+                    geometry: new THREE.PlaneGeometry(20, 10),
+                    position: [0, 5, -10],
+                    rotation: [0, 0, 0]
+                },
+                {
+                    geometry: new THREE.PlaneGeometry(20, 10),
+                    position: [0, 5, 10],
+                    rotation: [0, Math.PI, 0]
+                },
+                {
+                    geometry: new THREE.PlaneGeometry(20, 10),
+                    position: [-10, 5, 0],
+                    rotation: [0, Math.PI / 2, 0]
+                },
+                {
+                    geometry: new THREE.PlaneGeometry(20, 10),
+                    position: [10, 5, 0],
+                    rotation: [0, -Math.PI / 2, 0]
+                }
+            ];
+
+            walls.forEach(wall => {
+                const mesh = new THREE.Mesh(wall.geometry, wallMaterial.clone());
+                mesh.position.set(...wall.position);
+                mesh.rotation.set(...wall.rotation);
+                scene.add(mesh);
+            });
+        }
+
+        function addPainting(imagePath, x, y, z, id) {
+            // Create video element
+            const video = document.createElement('video');
+            video.src = `videos/${id}.mp4`;  // Load local video
+            video.loop = false;
+            video.preload = 'auto';
+            video.load();
+
+            const videoTexture = new THREE.VideoTexture(video);
+            const videoMaterial = new THREE.MeshBasicMaterial({ 
+                map: videoTexture,
+                transparent: true
+            });
+
+            // Load the image
+            const textureLoader = new THREE.TextureLoader();
+            textureLoader.load(imagePath, function(texture) {
+                const paintingMaterial = new THREE.MeshBasicMaterial({ 
+                    map: texture,
+                    transparent: true
+                });
+                
+                // Restore original dimensions
+                const paintingGeometry = new THREE.PlaneGeometry(2, 3);  // Original size
+                const painting = new THREE.Mesh(paintingGeometry, paintingMaterial);
+                
+                // Store references
+                painting.userData = {
+                    id: id,
+                    clickable: true,
+                    video: video,
+                    videoMaterial: videoMaterial,
+                    originalMaterial: paintingMaterial
+                };
+                
+                painting.position.set(x, y, z);
+                if (x < 0) painting.rotation.y = Math.PI / 2;
+                if (x > 0) painting.rotation.y = -Math.PI / 2;
+                
+                paintings[id] = painting;
+                scene.add(painting);
+            });
+        }
+
+        function onClick() {
+            if (document.activeElement === document.querySelector('.chat-input')) {
+                return;
+            }
+
+            if (!controls.isLocked) {
+                controls.lock();
+            }
+        }
+
+        function checkHover() {
+            const raycaster = new THREE.Raycaster();
+            const centerPoint = new THREE.Vector2(0, 0);
+            raycaster.setFromCamera(centerPoint, camera);
+            
+            const intersects = raycaster.intersectObjects(scene.children);
+            
+            if (intersects.length > 0) {
+                const object = intersects[0].object;
+                if (object.userData && object.userData.clickable) {
+                    renderer.domElement.classList.add('clickable');
+                    return;
+                }
+            }
+            renderer.domElement.classList.remove('clickable');
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+
+            if (controls.isLocked) {
+                const time = performance.now();
+                const delta = (time - prevTime) / 1000;
+
+                velocity.x -= velocity.x * 10.0 * delta;
+                velocity.z -= velocity.z * 10.0 * delta;
+
+                direction.z = Number(moveForward) - Number(moveBackward);
+                direction.x = Number(moveRight) - Number(moveLeft);
+                direction.normalize();
+
+                if (moveForward || moveBackward) velocity.z -= direction.z * 30.0 * delta;
+                if (moveLeft || moveRight) velocity.x -= direction.x * 40.0 * delta;
+
+                controls.moveRight(-velocity.x * delta);
+                controls.moveForward(-velocity.z * delta);
+
+                prevTime = time;
+                
+                // Check for hoverable objects
+                checkHover();
+            }
+
+            renderer.render(scene, camera);
+        }
+
+        function onKeyDown(event) {
+            switch (event.code) {
+                case 'KeyW': moveForward = true; break;
+                case 'KeyS': moveBackward = true; break;
+                case 'KeyA': moveLeft = true; break;
+                case 'KeyD': moveRight = true; break;
+            }
+        }
+
+        function onKeyUp(event) {
+            switch (event.code) {
+                case 'KeyW': moveForward = false; break;
+                case 'KeyS': moveBackward = false; break;
+                case 'KeyA': moveLeft = false; break;
+                case 'KeyD': moveRight = false; break;
+            }
+        }
+
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        // Replace the chat input handler
+        document.querySelector('.chat-input').addEventListener('keypress', async function(e) {
+            if (e.key === 'Enter') {
+                const input = this.value.trim();
+                if (!input) return;
+                
+                // Clear input
+                this.value = '';
+
+                // Add user message to chat
+                const chatHistory = document.querySelector('.chat-history');
+                const userMessage = document.createElement('div');
+                userMessage.className = 'chat-message user-message';
+                userMessage.textContent = input;
+                chatHistory.appendChild(userMessage);
+
+                // Check if it's a painting name first
+                const videoMap = {
+                    'stevejobs': 'stevejobs',
+                    'steve': 'stevejobs',
+                    'markzuckerberg': 'markzuckerberg',
+                    'mark': 'markzuckerberg',
+                    'elonmusk': 'elonmusk',
+                    'elon': 'elonmusk'
+                };
+
+                const normalizedInput = input.toLowerCase().replace(/\s+/g, '');
+                const videoId = videoMap[normalizedInput];
+
+                if (videoId && paintings[videoId]) {
+                    console.log('Playing introduction video for:', videoId);
+                    // Handle video playback
+                    const painting = paintings[videoId];
+                    const { video, videoMaterial } = painting.userData;
+
+                    if (activeVideo) {
+                        console.log('Stopping previous video/audio');
+                        activeVideo.pause();
+                        // Stop any playing audio
+                        const audioElements = document.getElementsByTagName('audio');
+                        for(let audio of audioElements) {
+                            audio.pause();
+                        }
+                        if (activePainting) {
+                            activePainting.material = activePainting.userData.originalMaterial;
+                        }
+                    }
+
+                    // Reset and play video
+                    video.currentTime = 0;
+                    video.play().then(() => {
+                        painting.material = videoMaterial;
+                        activeVideo = video;
+                        activePainting = painting;
+                        currentCharacter = videoId;
+                    }).catch(err => {
+                        console.error('Error playing video:', err);
+                        activeVideo = null;
+                        activePainting = null;
+                        currentCharacter = null;
+                    });
+                } else if (currentCharacter) {
+                    // Stop any playing video
+                    if (activeVideo) {
+                        console.log('Stopping video for new question');
+                        activeVideo.pause();
+                        if (activePainting) {
+                            activePainting.material = activePainting.userData.originalMaterial;
+                        }
+                    }
+                    
+                    // Stop any playing audio
+                    const audioElements = document.getElementsByTagName('audio');
+                    for(let audio of audioElements) {
+                        audio.pause();
+                    }
+
+                    console.log('Starting chat with:', currentCharacter);
+                    const aiMessage = document.createElement('div');
+                    aiMessage.className = 'chat-message ai-message';
+                    chatHistory.appendChild(aiMessage);
+
+                    try {
+                        console.log('Sending request to server:', CONFIG.API_URL + '/chat');
+                        console.log('Request data:', {
+                            prompt: characterPrompts[currentCharacter],
+                            question: input,
+                            character_id: currentCharacter
+                        });
+                        
+                        const response = await fetch(CONFIG.API_URL + '/chat', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify({
+                                prompt: characterPrompts[currentCharacter],
+                                question: input,
+                                character_id: currentCharacter
+                            })
+                        });
+                        
+                        console.log('Response status:', response.status);
+
+                        const reader = response.body.getReader();
+                        const decoder = new TextDecoder();
+
+                        while (true) {
+                            const {value, done} = await reader.read();
+                            if (done) {
+                                console.log('Stream complete');
+                                break;
+                            }
+                            
+                            const text = decoder.decode(value);
+                            console.log('Received chunk:', text);
+                            
+                            const lines = text.split('\n');
+                            for (const line of lines) {
+                                if (line.trim() === '') continue;
+                                if (line.startsWith('data: ')) {
+                                    try {
+                                        const data = JSON.parse(line.slice(5));
+                                        console.log('Parsed data:', data);
+                                        
+                                        if (data.chunk) {
+                                            aiMessage.textContent += data.chunk;
+                                            chatHistory.scrollTop = chatHistory.scrollHeight;
+                                        }
+
+                                        // Update the audio handling section:
+                                        if (data.audio) {
+                                            // Remove any existing audio elements
+                                            const audioElements = document.getElementsByTagName('audio');
+                                            for(let audio of audioElements) {
+                                                audio.remove();
+                                            }
+                                            
+                                            const audio = new Audio(`/audio/${data.audio}`);
+                                            audio.play().catch(err => console.error('Error playing audio:', err));
+                                        }
+                                    } catch (e) {
+                                        console.error('Parse error:', e, line);
+                                    }
+                                }
+                            }
+                        }
+                    } catch (error) {
+                        console.error('Error details:', error);
+                        aiMessage.textContent = "Error connecting to the server. Please try again.";
+                    }
+                } else {
+                    // Add message to select a painting first
+                    const aiMessage = document.createElement('div');
+                    aiMessage.className = 'chat-message ai-message';
+                    aiMessage.textContent = "Please select a painting to talk to first.";
+                    chatHistory.appendChild(aiMessage);
+                }
+
+                chatHistory.scrollTop = chatHistory.scrollHeight;
+            }
+        });
+
+        // Update pointer lock to not lock when clicking chat input
+        document.querySelector('.chat-input').addEventListener('click', function(e) {
+            e.stopPropagation();
+        });
+
+        // Add this after other event listeners
+        document.querySelector('.chat-toggle').addEventListener('click', function() {
+            document.querySelector('.chat-container').classList.toggle('visible');
+        });
+
+        init();
+    </script>
+</body>
+</html>
