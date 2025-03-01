@@ -4,5 +4,5 @@ requests
 gunicorn
 python-dotenv
 elevenlabs
-google-generativeai
-flask-limiter 
+flask-limiter
+google-generativeai>=0.8.0 

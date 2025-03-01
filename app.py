@@ -6,7 +6,7 @@ import json
 import requests
 import time
 from flask_limiter import Limiter
-import google.generativeai as genai
+from google import genai  # Updated import
 
 app = Flask(__name__)
 CORS(app, resources={r"/*": {"origins": "*"}}, 
@@ -22,10 +22,10 @@ client = ElevenLabs(
     api_key=os.getenv('ELEVENLABS_API_KEY')
 )
 
-# Initialize Gemini
+# Initialize Gemini with the new SDK
 genai.configure(api_key=os.getenv('GEMINI_API_KEY'))
 
-# Add this near the top of your file
+# Voice IDs for characters
 VOICE_IDS = {
     'stevejobs': "cjVigY5qzO86Huf0OWal",  # Professional male voice
     'markzuckerberg': "SOYHLrjzK2X1ezoPC6cr",  # Young male voice
@@ -49,28 +49,6 @@ def serve_image(filename):
 def serve_video(filename):
     return send_file(os.path.join('videos', filename))
 
-def text_to_speech(text, character_id):
-    voice_id = VOICE_IDS.get(character_id, "JBFqnCBsd6RMkjVDRZzb")  # Default if not found
-    url = f"https://api.elevenlabs.io/v1/text-to-speech/{voice_id}"
-    
-    headers = {
-        "xi-api-key": os.getenv('ELEVENLABS_API_KEY'),
-        "Content-Type": "application/json"
-    }
-    
-    data = {
-        "text": text,
-        "model_id": "eleven_multilingual_v2"
-    }
-    
-    try:
-        response = requests.post(url, json=data, headers=headers)
-        response.raise_for_status()
-        return response.content
-    except Exception as e:
-        print(f"TTS Error: {e}")
-        return None
-
 @app.route('/chat', methods=['POST'])
 @limiter.limit("20 per day")  # Adjust as needed
 def chat():
@@ -87,17 +65,17 @@ def chat():
 
     def generate():
         try:
-            # Use Gemini API
-            model = genai.GenerativeModel('gemini-pro')
+            # Use the new Gemini API client
+            gemini_client = genai.Client(api_key=os.getenv('GEMINI_API_KEY'))
             
             try:
-                # Simplified prompt structure with safety settings
-                response = model.generate_content(
-                    f"You are {prompt}. Answer this question briefly in 1-2 sentences: {question}",
-                    generation_config={
-                        "temperature": 0.7,
-                        "max_output_tokens": 100,
-                    }
+                # Create the prompt with character context
+                full_prompt = f"You are {prompt}. Answer this question briefly in 1-2 sentences: {question}"
+                
+                # Generate content with the new API
+                response = gemini_client.models.generate_content(
+                    model="gemini-1.5-flash",  # Using the latest model
+                    contents=full_prompt
                 )
                 
                 answer = response.text.strip()
